@@ -32,6 +32,7 @@ Maestro is a hierarchical AI orchestration system where a central "Maestro" agen
 - **Right model for the right job** — Cost/speed/capability optimization
 - **Human-in-the-loop** — Configurable approval gates
 - **Fractal design** — Sub-agents can be Maestros themselves (nested orchestration)
+- **Maestro has agency** — Makes intelligent decisions, not just rule-following
 
 ---
 
@@ -227,6 +228,181 @@ User Request
 
 ---
 
+## CLI Interface
+
+**Primary interface:** Command-line with interactive TUI dashboard
+
+### Commands
+
+```bash
+# Start a new orchestration
+maestro run "Build a stock ticker CLI app" --repo ./stock-ticker
+
+# With policy level
+maestro run "..." --policy balanced
+
+# Check status
+maestro status
+maestro status --tasks
+maestro status --deps
+
+# Interact with approval gates
+maestro approve
+maestro reject
+maestro modify
+
+# History
+maestro history
+maestro history --session <id>
+
+# Learning management
+maestro learn --show
+maestro learn --export patterns.yaml
+```
+
+### TUI Dashboard
+
+Interactive terminal UI inspired by btop/htop:
+
+```
+┌─ 🎼 Maestro ─────────────────────────────────────────────────────────────┐
+│  Project: stock-ticker-app          Policy: Balanced     ⏱ 4m 32s       │
+│  Status: Running                    Gate: 3/5 (Milestone)               │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌─ Task List ───────────────────┐  ┌─ Active Agents ─────────────────┐ │
+│  │ ✓ database-schema     2m      │  │                                  │ │
+│  │ ▶ auth-logic          4m      │  │  ▶ sonnet-4.5  ████████░░ 78%   │ │
+│  │   ├─ depends: database        │  │    └─ api-endpoints.py           │ │
+│  │   └─ blocks: api, middleware  │  │    └─ 1.2k tokens • $0.003       │ │
+│  │ ◦ api-routes          -       │  │                                  │ │
+│  │ ◦ middleware          -       │  │  ▶ haiku-4.5   ██████████ done   │ │
+│  │ ◦ integration         -       │  │    └─ schema.sql ✓               │ │
+│  └───────────────────────────────┘  └──────────────────────────────────┘ │
+│                                                                          │
+│  ┌─ Live Output ─────────────────────────────────────────────────────┐  │
+│  │ [sonnet] Creating API endpoint for /api/auth/login...             │  │
+│  │ [sonnet] Adding JWT token validation middleware...                │  │
+│  │ [sonnet] Writing tests for authentication flow...                 │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│ [a]pprove  [f]ocus agent  [l]ogs  [g]raph  [p]ause  [q]uit              │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key features:**
+- **Active Agents panel** — Real-time progress, tokens, cost
+- **Live Output** — Streaming agent work
+- **Task List** — Default view with dependency annotations (scales well)
+- **Task Graph** — Optional visual view (toggle with `g`)
+- **Keyboard-driven** — Full control without mouse
+
+---
+
+## Agent Configuration
+
+### Config Structure
+
+```yaml
+# ~/.maestro/config.yaml
+
+maestro:
+  model: claude-opus-4-6
+  provider: anthropic
+  role: orchestrator
+
+agents:
+  sonnet:
+    model: claude-sonnet-4-5
+    provider: anthropic
+    description: "Best for complex implementation, algorithms, careful work"
+    cost_per_1k_tokens: 0.003
+    max_tokens: 8192
+    
+  haiku:
+    model: claude-haiku-4-5
+    provider: anthropic
+    description: "Fast and cheap, good for simple tasks and boilerplate"
+    cost_per_1k_tokens: 0.00025
+    max_tokens: 4096
+    
+  gemini:
+    model: gemini-3.0-pro
+    provider: google
+    description: "Good for Google APIs, long context tasks"
+    cost_per_1k_tokens: 0.001
+    max_tokens: 32000
+
+providers:
+  anthropic:
+    credential: env:ANTHROPIC_API_KEY
+    rate_limit:
+      requests_per_minute: 50
+      tokens_per_minute: 100000
+      
+  google:
+    credential: env:GOOGLE_API_KEY
+    rate_limit:
+      requests_per_minute: 30
+
+budgets:
+  default_per_session: 5.00
+  warning_threshold: 0.80
+```
+
+### Security: Credentials
+
+**Principle:** Sub-agents are untrusted. They never see credentials.
+
+- Config uses references: `env:ANTHROPIC_API_KEY`
+- Maestro loads credentials at runtime
+- Sub-agents receive credential-free context
+- Logs sanitize any accidental exposure
+
+```
+┌─────────────┐
+│   Maestro   │ ← Holds credentials, makes API calls
+└──────┬──────┘
+       │ (credential-free context)
+       ▼
+┌─────────────┐
+│ Sub-agents  │ ← Never see API keys
+└─────────────┘
+```
+
+### Agent Routing
+
+**Approach:** Hybrid — soft hints + Maestro judgment
+
+- Agents have descriptions of their strengths
+- Maestro uses judgment to match tasks to agents
+- Learning improves routing over time
+- No rigid rules — Maestro has agency
+
+### Cost Controls
+
+- Budget per session (configurable, per-project overrides)
+- Real-time cost tracking displayed in TUI
+- **Hard stop at budget limit** → approval gate to continue
+- Prevents surprise bills
+
+### Rate Limiting
+
+- Configurable limits per provider
+- Maestro queues API calls
+- Max N concurrent requests per provider
+- Auto-retry with exponential backoff on 429s
+
+### Fallback Strategy
+
+- No explicit fallback chains in config
+- Maestro observes failures
+- Maestro decides reassignment using judgment + learning
+- Keeps config simple, leverages Maestro's intelligence
+
+---
+
 ## Future Considerations
 
 - **Nested Maestros** — Sub-agent can itself be a Maestro for complex subsystems
@@ -234,18 +410,23 @@ User Request
 - **Direct agent channels** — P2P communication for tightly coupled tasks
 - **Vector embeddings** — Semantic search over learnings at scale
 - **Integration tests** — Automated validation gates
+- **Web Portal** — Kanban-style visualization (post-MVP)
+- **Chat interface** — Conversational interaction (Telegram, etc.)
 
 ---
 
-## Interfaces
+## Comparison with OpenClaw
 
-Maestro supports multiple interaction surfaces:
+| Aspect | OpenClaw | Maestro |
+|--------|----------|---------|
+| **Focus** | Personal assistant | Project execution |
+| **Models** | Single (configured) | Multiple (strategic) |
+| **Interaction** | Conversational | Task-based with gates |
+| **Sub-agents** | Isolated spawns | Coordinated orchestra |
+| **Learning** | Memory files | Structured patterns |
+| **Best for** | Daily tasks, chat | Complex builds |
 
-- **CLI** — Command-line task submission and monitoring
-- **Web Portal** — Kanban-style task visualization
-- **Chat** — Conversational interface (Telegram, etc.)
-
-All interfaces communicate with the same Maestro core.
+**Complementary:** OpenClaw (Felix) could invoke Maestro for complex projects while handling daily tasks directly.
 
 ---
 

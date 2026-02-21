@@ -51,17 +51,24 @@ Maestro is a hierarchical AI orchestration system where a central "Maestro" agen
 
 ## Status
 
-🚧 **Architecture Phase** — Documenting design decisions before implementation.
+🚧 **Architecture Phase** — Design decisions documented, ready for implementation.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design documentation.
 
 ## Roadmap
 
-- [x] Architecture design
-- [ ] Core Maestro implementation
+### Design (Complete)
+- [x] Core architecture (5 foundational decisions)
+- [x] CLI/TUI interface design
+- [x] Agent configuration design
+
+### Implementation (Upcoming)
+- [ ] MVP scope definition
+- [ ] Implementation stack decision
+- [ ] Core Maestro orchestration
 - [ ] Sub-agent adapters (Claude, Gemini, etc.)
-- [ ] CLI interface
-- [ ] Web portal
+- [ ] CLI with TUI dashboard
+- [ ] State management (`~/.maestro/`)
 - [ ] Learning system
 - [ ] Integration agent
 
